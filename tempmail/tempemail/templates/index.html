@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="jumbotron text-center">
+    <div class="row">
+        <div class="col-md-12 text-center">
+            <h2>Temp Mail Generator</h2>
+            <button class="btn btn-primary" onclick="fetchMailbox()">Generate Mailbox</button>
+            <h3 class="mt-3" id="mailbox"></h3>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <h2>Messages</h2>
+        <div id="message-content" class="mt-3"></div>
+    </div>
+</div>
+
+<style>
+    body {
+        background-color: black;
+    }
+
+    .jumbotron {
+        background-color: #73e600!important;
+
+    }
+
+    .message-card {
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 15px;
+        margin-bottom: 10px;
+        background-color: #f9f9f9;
+    }
+    .message-header {
+        font-weight: bold;
+    }
+    .message-body {
+        white-space: pre-wrap; /* Preserve line breaks */
+    }
+    #message-content  {
+        background-color: #b3ffb3!important;
+    }
+</style>
+
+<script>
+    function fetchMailbox() {
+        fetch('/tempemail/generate-mailbox/')
+            .then(response => response.json())
+            .then(data => {
+                const mailboxElement = document.getElementById('mailbox');
+                if (data.mailbox) {
+                    mailboxElement.textContent = data.mailbox;
+                    checkMessages(data.mailbox);
+                    setInterval(() => checkMessages(data.mailbox), 10000); // Check for new messages every 10 seconds
+                } else {
+                    mailboxElement.textContent = 'Failed to fetch mailbox';
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+    
+    function checkMessages(mailbox) {
+        fetch('/tempemail/check-messages/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: `mailbox=${mailbox}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            const messageContent = document.getElementById('message-content');
+            if (data.message && data.message !== 'No new messages') {
+                messageContent.innerHTML = `
+                    <div class="message-card">
+                        <div class="message-header">
+                            <strong>From:</strong> ${data.message.from}<br>
+                            <strong>Subject:</strong> ${data.message.subject}<br>
+                            <strong>Date:</strong> ${data.message.date}
+                        </div>
+                        <div class="message-body">
+                            <strong>Body:</strong><br>
+                            ${data.message.htmlBody || data.message.textBody}
+                        </div>
+                    </div>
+                `;
+            } else {
+                messageContent.innerHTML = '<div class="alert alert-info">No new messages</div>';
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+    
+    // Function to get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    </script>
+{% endblock %}
